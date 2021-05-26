@@ -13,11 +13,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -26,10 +28,48 @@ import (
 //go:embed data
 var data embed.FS
 
-// ExtractData extract the terraform module embedded into the binary to
+// ExtractModule extract the terraform module embedded into the binary to
 // a directory
-func ExtractModule(module string, destdir string) {
+func ExtractModule(module string, destdir string) error {
+	err := os.MkdirAll(destdir, 0755)
+	if err != nil {
+		return err
+	}
 
+	paths, err := fs.Glob(data, filepath.Join("data", module, "*"))
+	if err != nil {
+		return err
+	}
+
+	for _, src := range paths {
+		dst := filepath.Join(destdir, strings.TrimPrefix(src, "data/"))
+		log.Println("extracting:", src)
+
+		err := os.MkdirAll(filepath.Dir(dst), 0755)
+		if err != nil {
+			return err
+		}
+
+		f, err := os.Create(dst)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		contents, err := data.ReadFile(src)
+		if err != nil {
+			return err
+		}
+
+		_, err = f.Write(contents)
+		if err != nil {
+			return err
+		}
+
+		f.Close()
+	}
+
+	return nil
 }
 
 // Install downloads, checks and install terraform into the target directory
@@ -143,7 +183,7 @@ func InstallTerraform(destdir string, version string) error {
 }
 
 //
-func InstallLibvirtProvider(destdir string, version string, distrib string) error {
+func InstallLibvirtProvider(destdir string, version string) error {
 	err := os.MkdirAll(destdir, 0755)
 	if err != nil {
 		return err
@@ -154,14 +194,18 @@ func InstallLibvirtProvider(destdir string, version string, distrib string) erro
 		return err
 	}
 
-	target := distrib
+	distrib, err := findHostDistrib()
+	if err != nil {
+		return err
+	}
+
 	if distrib == "Debian" {
-		target = "Ubuntu"
+		distrib = "Ubuntu"
 	}
 
 	var sum, archive string
 	for _, l := range chksums {
-		if strings.Contains(l, target) {
+		if strings.Contains(l, distrib) {
 			elems := strings.Split(l, " ")
 			sum = elems[0]
 			archive = elems[len(elems)-1]
@@ -170,7 +214,7 @@ func InstallLibvirtProvider(destdir string, version string, distrib string) erro
 	}
 
 	if sum == "" {
-		return fmt.Errorf("could not find provider file for distrib: %s", target)
+		return fmt.Errorf("could not find provider file for distrib: %s", distrib)
 	}
 
 	log.Println("selected:", archive)
@@ -237,10 +281,40 @@ func InstallLibvirtProvider(destdir string, version string, distrib string) erro
 		return err
 	}
 
-	// destdir en dur pour ~/.local/share/terraform/plugins/registry.terraform.io/dmacvicar/libvirt/0.6.2/linux_amd64
-
 	return nil
 
+}
+
+func LinkLibvirtProvider(srcDir string, version string) error {
+	homeDir := os.Getenv("HOME")
+	if homeDir == "" {
+		u, err := user.Current()
+		if err != nil {
+			return fmt.Errorf("could not lookup current user: %w", err)
+		}
+
+		homeDir = u.HomeDir
+		if homeDir == "" {
+			return fmt.Errorf("empty home directory")
+		}
+	}
+
+	linkDir := filepath.Join(homeDir, fmt.Sprintf(".local/share/terraform/plugins/registry.terraform.io/dmacvicar/libvirt/%s/linux_amd64", version))
+
+	err := os.MkdirAll(linkDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	link := filepath.Join(linkDir, "terraform-provider-libvirt")
+	src := filepath.Join(srcDir, "terraform-provider-libvirt")
+
+	_, err = os.Stat(link)
+	if errors.Is(err, os.ErrNotExist) {
+		err = os.Symlink(src, link)
+	}
+
+	return err
 }
 
 func checkHash(path, sum string) error {
@@ -299,7 +373,7 @@ func getLibvirtProviderSumFile(version string) ([]string, error) {
 	return output, nil
 }
 
-func FindHostDistrib() (string, error) {
+func findHostDistrib() (string, error) {
 	prog, err := exec.LookPath("lsb_release")
 	if err != nil {
 		return "", err

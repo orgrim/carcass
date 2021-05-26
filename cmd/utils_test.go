@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestPrepareWorkDir(t *testing.T) {
+func TestExpandDataDir(t *testing.T) {
 	u, err := user.Current()
 	if err != nil {
 		t.Errorf("could not get current user: %s", err)
@@ -30,7 +30,7 @@ func TestPrepareWorkDir(t *testing.T) {
 
 	for i, st := range tests {
 		t.Run(fmt.Sprintf("%v", i), func(t *testing.T) {
-			got, err := prepareWorkDir(st.input)
+			got, err := expandDataDir(st.input)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

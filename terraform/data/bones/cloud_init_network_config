@@ -1,0 +1,11 @@
+version: 2
+ethernets:
+  ${iface}:
+    match:
+      name: ${iface}
+    addresses:
+      - ${ip}/24
+    gateway4: ${gw}
+    nameservers:
+      search: [${domain}]
+      addresses: [${gw}]

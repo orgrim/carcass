@@ -5,6 +5,7 @@
 package terraform
 
 import (
+	"errors"
 	"fmt"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"io"
 	"os"
+	"os/user"
 )
 
 type Config struct {
@@ -102,4 +104,52 @@ func WriteModuleConfig(dst io.Writer, conf Config) error {
 	}
 
 	return nil
+}
+
+func NewConfiguration(modulePath string, domain string, netCIDR string) (Config, error) {
+	_, err := os.Stat(modulePath)
+	if errors.Is(err, os.ErrNotExist) {
+		return Config{}, fmt.Errorf("module path does not exist")
+	}
+
+	username := "carcass"
+	if u, err := user.Current(); err == nil {
+		username = u.Username
+	}
+
+	vms := make(map[string]Machine)
+
+	mod := Module{
+		Name:        "carcass",
+		Source:      modulePath,
+		StoragePool: "default",
+		Username:    username,
+		Domain:      domain,
+		NetworkName: domain,
+		NetworkCIDR: netCIDR,
+		Machines:    vms,
+	}
+
+	prov := Provider{
+		Name: "libvirt",
+		Uri:  "qemu:///system", // XXX var
+	}
+
+	meta := Meta{
+		TfVersion: ">= 0.13",
+		ReqProviders: ReqProvider{
+			Libvirt: ProviderInfo{
+				Source:  "dmacvicar/libvirt",
+				Version: "~> 0.6.3",
+			},
+		},
+	}
+
+	cfg := Config{
+		Provider: prov,
+		Module:   mod,
+		Meta:     meta,
+	}
+
+	return cfg, nil
 }

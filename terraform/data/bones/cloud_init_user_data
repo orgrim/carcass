@@ -1,0 +1,24 @@
+#cloud-config
+
+timezone: "Europe/Paris"
+
+ssh_pwauth: False
+
+chpasswd:
+  list: |
+     root:dalibo
+  expire: False
+
+users:
+  - name: ${username}
+    ssh_authorized_keys:
+      - ${ssh_pubkey}
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+    groups: users
+
+disk_setup:
+  /dev/sdb:
+    table_type: 'mbr'
+    layout:
+      - [110, 8e]

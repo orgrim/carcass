@@ -26,18 +26,33 @@ Terraform, Ansible, CFSSL`,
 )
 
 func bootstrap(cmd *cobra.Command, args []string) {
-	distrib, err := terraform.FindHostDistrib()
+	binDir, err := binaryDir(DataDir)
 	if err != nil {
-		log.Println(err)
+		log.Fatalln("invalid data directory:", err)
 	}
 
-	err = terraform.InstallTerraform("_work/bin", "0.15.3")
+	err = terraform.InstallTerraform(binDir, "0.15.3")
 	if err != nil {
-		log.Println(err)
+		log.Fatalln("could not install terraform:", err)
 	}
 
-	err = terraform.InstallLibvirtProvider("_work/bin", "0.6.3", distrib)
+	err = terraform.InstallLibvirtProvider(binDir, "0.6.3")
 	if err != nil {
-		log.Println(err)
+		log.Fatalln("could not install terraform-libvirt-provider:", err)
+	}
+
+	tfBaseDir, err := terraformBaseModDir(DataDir)
+	if err != nil {
+		log.Fatalln("invalid data directory:", err)
+	}
+
+	err = terraform.ExtractModule("bones", tfBaseDir)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	err = terraform.LinkLibvirtProvider(binDir, "0.6.3")
+	if err != nil {
+		log.Fatalln(err)
 	}
 }
