@@ -102,18 +102,6 @@ resource "libvirt_domain" "kvm" {
 
   cloudinit = libvirt_cloudinit_disk.ci_disk[each.key].id
 
-  provisioner "remote-exec" {
-    inline = ["echo 'Hello World'"]
-    on_failure = continue
-
-    connection {
-      type = "ssh"
-      host = "${each.key}.${var.dns_domain}"
-      user = var.user_name
-    }
-
-  }
-
   for_each = var.vms
 }
 
