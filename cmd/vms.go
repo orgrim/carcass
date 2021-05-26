@@ -20,6 +20,8 @@ func init() {
 	addVmCmd.Flags().IntVar(&vcpu, "vcpu", 2, "Number of vCPUs")
 	addVmCmd.Flags().IntVar(&memory, "ram", 2048, "Amount of RAM in Megabytes")
 	addVmCmd.Flags().IntVar(&dataSize, "data", 8, "Size of the data disk in Gigabytes")
+
+	rootCmd.AddCommand(rmVmCmd)
 }
 
 var (
@@ -33,6 +35,12 @@ var (
 	vcpu      int
 	memory    int
 	dataSize  int
+
+	rmVmCmd = &cobra.Command{
+		Use:   "rmvm env vmname",
+		Short: "Remove a VM from an environment",
+		Run:   rmvm,
+	}
 )
 
 func addvm(cmd *cobra.Command, args []string) {
@@ -115,5 +123,68 @@ func selectIFace(distrib string) string {
 		return "eth0"
 	default:
 		return "eth0"
+	}
+}
+
+func rmvm(cmd *cobra.Command, args []string) {
+	if len(args) < 2 {
+		log.Fatalln("missing environment name ov vm name")
+	}
+
+	envName := args[0]
+	if hasForbiddenChars(envName) || len(envName) == 0 {
+		log.Fatalln("invalid environment name")
+	}
+
+	vmName := args[1]
+	if hasForbiddenChars(vmName) || len(vmName) == 0 {
+		log.Fatalln("invalid vm name")
+	}
+
+	envPath, err := environmentDir(DataDir, envName)
+	if err != nil {
+		log.Fatalln("invalid data directory:", err)
+	}
+
+	_, err = os.Stat(envPath)
+	if errors.Is(err, os.ErrNotExist) {
+		log.Fatalln("environment does not exist")
+	}
+
+	tfConfigDir := filepath.Join(envPath, "terraform")
+	tfConfigPath := filepath.Join(tfConfigDir, "main.tf")
+
+	conf, err := terraform.ParseModuleConfig(tfConfigPath)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	if _, ok := conf.Module.Machines[vmName]; !ok {
+		log.Fatalln("VM not found in the terraform config of the environment")
+	}
+
+	delete(conf.Module.Machines, vmName)
+
+	dst, err := os.Create(tfConfigPath)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	if err := terraform.WriteModuleConfig(dst, conf); err != nil {
+		dst.Close()
+		log.Fatalln(err)
+	}
+
+	dst.Close()
+
+	binDir, _ := binaryDir(DataDir)
+	if err := terraform.Apply(binDir, tfConfigDir); err != nil {
+		log.Fatalln(err)
+	}
+
+	// Force dnsmasq to re-read the addn-hosts file so that we can resolv
+	// the name of the vm
+	if err := restartDnsmasq(); err != nil {
+		log.Fatalln(err)
 	}
 }
