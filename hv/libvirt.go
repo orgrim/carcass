@@ -7,7 +7,7 @@ package hv
 import (
 	"encoding/xml"
 	"fmt"
-	libvirt "libvirt.org/libvirt-go"
+	libvirt "libvirt.org/go/libvirt"
 	"log"
 )
 
