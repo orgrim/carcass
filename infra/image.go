@@ -39,38 +39,28 @@ func NewImage(name string, pool string) *Image {
 	}
 }
 
-// Store downloads or copies the image located at source to the volume on the
-// hypervisor. The format of source is an path or URL, currently supported schemes
-// are file, http and https
-func (i *Image) Store(h *hv.Hypervisor, source string) error {
-	exists, err := i.Exists(h)
-	if err != nil {
-		return fmt.Errorf("image store: %w", err)
-	}
-
-	if exists {
-		return fmt.Errorf("image store: image already exists on hypervisor")
-	}
+// ImageGetSource sets up a ReadCloser and gets the total size of the source. The
+// format of source is an path or URL, currently supported schemes are file,
+// http and https.
+func ImageGetSource(source string) (io.ReadCloser, int64, error) {
+	var (
+		data   io.ReadCloser
+		length int64
+	)
 
 	// get a Reader to the source data, along with the size of the
 	// data. The size is necessary as volume creation requires to declare
 	// the capacity of the volume
 	u, err := url.Parse(source)
 	if err != nil {
-		return fmt.Errorf("image store: could not parse source: %w", err)
+		return data, length, fmt.Errorf("image get source: could not parse source: %w", err)
 	}
-
-	var (
-		data   io.Reader
-		length int64
-	)
 
 	if strings.HasPrefix(u.Scheme, "http") {
 		resp, err := http.Get(source)
 		if err != nil {
-			return fmt.Errorf("image store: http get failed: %w", err)
+			return data, length, fmt.Errorf("image get source: http get failed: %w", err)
 		}
-		defer resp.Body.Close()
 
 		data = resp.Body
 		length = resp.ContentLength
@@ -78,19 +68,34 @@ func (i *Image) Store(h *hv.Hypervisor, source string) error {
 	} else if u.Scheme == "file" || u.Scheme == "" {
 		f, err := os.Open(u.Path)
 		if err != nil {
-			return fmt.Errorf("image store: %s: %w", u.Path, err)
+			return data, length, fmt.Errorf("image get source: %s: %w", u.Path, err)
 		}
-		defer f.Close()
 
 		finfo, err := f.Stat()
 		if err != nil {
-			return fmt.Errorf("image store: stat failed: %w", err)
+			return data, length, fmt.Errorf("image get source: stat failed: %w", err)
 		}
 
 		data = f
 		length = finfo.Size()
 	} else {
-		return fmt.Errorf("image store: unsupported URL: %s", source)
+		return data, length, fmt.Errorf("image get source: unsupported URL: %s", source)
+	}
+
+	return data, length, nil
+}
+
+// Store downloads or copies the image pointed by the data Reader to the volume
+// on the hypervisor. The size of the image must be specified to create the
+// volume with the correct capacity on the hypervisor.
+func (i *Image) Store(h *hv.Hypervisor, data io.Reader, length int64) error {
+	exists, err := i.Exists(h)
+	if err != nil {
+		return fmt.Errorf("image store: %w", err)
+	}
+
+	if exists {
+		return fmt.Errorf("image store: image already exists on hypervisor")
 	}
 
 	// create the volume and use the API of the hypervisor to send the

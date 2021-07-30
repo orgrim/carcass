@@ -10,6 +10,7 @@ import (
 
 	"github.com/orgrim/carcass/hv"
 	"github.com/orgrim/carcass/infra"
+	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 )
 
@@ -91,8 +92,17 @@ func addImage(cmd *cobra.Command, args []string) {
 	}
 	defer h.Close()
 
+	data, length, err := infra.ImageGetSource(rawurl)
+	if err != nil {
+		log.Fatalln("could not open source:", err)
+	}
+
+	bar := progressbar.DefaultBytes(length, "transfering")
+	pdata := progressbar.NewReader(data, bar)
+	defer pdata.Close()
+
 	image := infra.NewImage(name, poolName)
-	err = image.Store(&h, rawurl)
+	err = image.Store(&h, &pdata, length)
 	if err != nil {
 		log.Fatalln("could not add image:", err)
 	}
