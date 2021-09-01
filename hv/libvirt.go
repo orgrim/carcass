@@ -9,6 +9,7 @@ import (
 	"fmt"
 	libvirt "libvirt.org/go/libvirt"
 	"log"
+	"net"
 )
 
 type Hypervisor struct {
@@ -68,7 +69,7 @@ type Network struct {
 	XMLName xml.Name   `xml:"network"`
 	Name    string     `xml:"name"`
 	Uuid    string     `xml:"uuid"`
-	Address IP         `xml:"ip"` // bridge address
+	Address NetIP      `xml:"ip"` // bridge address
 	Mac     MacAddress `xml:"mac"`
 	Hosts   []DnsHost  `xml:"dns>host"`
 }
@@ -101,10 +102,29 @@ type Network struct {
 // 	return nil
 // }
 
-type IP struct {
+type NetIP struct {
 	Family  string `xml:"family,attr"`
 	Address string `xml:"address,attr"`
 	Prefix  int    `xml:"prefix,attr"`
+	Netmask string `xml:"netmask,attr"`
+}
+
+func (i NetIP) String() string {
+
+	var mask net.IPMask
+
+	if i.Netmask != "" {
+		mask = net.IPMask(net.ParseIP(i.Netmask))[12:]
+	} else {
+		mask = net.CIDRMask(i.Prefix, 32)
+	}
+
+	n := &net.IPNet{
+		IP:   net.ParseIP(i.Address).Mask(mask),
+		Mask: mask,
+	}
+
+	return n.String()
 }
 
 type DnsHost struct {
@@ -134,12 +154,22 @@ func (dom Domain) String() string {
 
 func (n Network) String() string {
 	s := fmt.Sprintf("Network: %s %s\n", n.Name, n.Uuid)
-	s += fmt.Sprintf("  address: %s/%d\n", n.Address.Address, n.Address.Prefix)
+	s += fmt.Sprintf("  address: %s\n", n.Address)
 	s += "  hosts:\n"
 	for _, h := range n.Hosts {
 		s += fmt.Sprintf("    %s  %s\n", h.Address, h.Hostname)
 	}
 	return s
+}
+
+func (n Network) LookupDnsHostByName(name string) net.IP {
+	for _, entry := range n.Hosts {
+		if entry.Hostname == name {
+			return net.ParseIP(entry.Address)
+		}
+	}
+
+	return net.IP{}
 }
 
 func NewHypervisor(uri string) (Hypervisor, error) {

@@ -34,10 +34,24 @@ func (e Environment) String() string {
 		s += fmt.Sprintf(" (%s)\n", e.Description)
 	}
 
-	s += fmt.Sprintf("  Network: %s\n", e.Infra.Network.Name)
+	s += fmt.Sprintf("  Network: %s  %s\n", e.Infra.Network.Name, e.Infra.Network.Address)
 	s += "  Machines:\n"
+
+	width := 0
+	for _, d := range e.Infra.Machines {
+		if len(d.Name) > width {
+			width = len(d.Name)
+		}
+	}
+
 	for _, d := range e.Infra.Machines {
 		s += fmt.Sprintf("    - %s", d.Name)
+
+		for i := 0; i < (width - len(d.Name)); i++ {
+			s += fmt.Sprintf(" ")
+		}
+
+		s += fmt.Sprintf("  %s", e.Infra.Network.LookupDnsHostByName(d.Name))
 		if d.Status {
 			s += fmt.Sprintln(" (active)")
 		} else {

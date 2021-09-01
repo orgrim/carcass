@@ -40,12 +40,27 @@ func list(cmd *cobra.Command, args []string) {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		width := 0
 		for _, net := range nets {
+			if len(net.Name) > width {
+				width = len(net.Name)
+			}
 			if listAll {
 				args = append(args, net.Name)
 				continue
 			}
-			fmt.Println(net.Name)
+		}
+
+		if !listAll {
+			for _, net := range nets {
+				fmt.Printf("%s", net.Name)
+
+				for i := 0; i < (width - len(net.Name)); i++ {
+					fmt.Printf(" ")
+				}
+
+				fmt.Printf("  %s\n", net.Address)
+			}
 		}
 	}
 
