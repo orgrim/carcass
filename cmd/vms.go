@@ -14,22 +14,30 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(addVmCmd)
 	addVmCmd.Flags().StringVar(&ipAddress, "ip", "", "IP Address of the VM in the network of the environment")
 	addVmCmd.Flags().StringVar(&distrib, "distrib", "debian10", "Codename of the OS of the VM. See image")
 	addVmCmd.Flags().IntVar(&vcpu, "vcpu", 2, "Number of vCPUs")
 	addVmCmd.Flags().IntVar(&memory, "ram", 2048, "Amount of RAM in Megabytes")
 	addVmCmd.Flags().IntVar(&dataSize, "data", 8, "Size of the data disk in Gigabytes")
+	vmCmd.AddCommand(addVmCmd)
 
-	rootCmd.AddCommand(rmVmCmd)
+	vmCmd.AddCommand(rmVmCmd)
+
+	rootCmd.AddCommand(vmCmd)
 }
 
 var (
+	vmCmd = &cobra.Command{
+		Use:   "vm [action]",
+		Short: "Manage virtual machines",
+	}
+
 	addVmCmd = &cobra.Command{
-		Use:   "addvm env vmname",
+		Use:   "add <env> <shortname> [options]",
 		Short: "Add a VM to an environment",
 		Run:   addvm,
 	}
+
 	ipAddress string
 	distrib   string
 	vcpu      int
@@ -37,7 +45,7 @@ var (
 	dataSize  int
 
 	rmVmCmd = &cobra.Command{
-		Use:   "rmvm env vmname",
+		Use:   "rm <env> <shortname>",
 		Short: "Remove a VM from an environment",
 		Run:   rmvm,
 	}
