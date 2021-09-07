@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"math"
-	"time"
 
 	libvirt "libvirt.org/go/libvirt"
 )
@@ -251,10 +250,7 @@ func UploadVolume(h Hypervisor, poolName string, volName string, r io.Reader) er
 	// initiate the upload. We still have to send data
 	err = sv.Upload(stream, 0, 0, libvirt.STORAGE_VOL_UPLOAD_SPARSE_STREAM)
 
-	copied := 0
-	total := 0
 	buf := make([]byte, 1024)
-	ts := time.Now()
 	for {
 		got, err := r.Read(buf)
 		if err != nil {
@@ -282,21 +278,7 @@ func UploadVolume(h Hypervisor, poolName string, volName string, r io.Reader) er
 			offset += sent
 		}
 
-		// transfer rate
-		copied += got
-		total += got
-		t := time.Now()
-		elapsed := t.Sub(ts)
-		if elapsed >= time.Second {
-			fmt.Printf("transfering at: %s/s %s    \r",
-				sizePretty(copied/int(elapsed/time.Second)),
-				sizePretty(total),
-			)
-			copied = 0
-			ts = t
-		}
 	}
-	fmt.Printf("\n")
 
 	ferr := stream.Finish()
 	if ferr != nil {
