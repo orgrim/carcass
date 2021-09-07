@@ -110,11 +110,10 @@ type NetIP struct {
 }
 
 func (i NetIP) String() string {
-
 	var mask net.IPMask
 
 	if i.Netmask != "" {
-		mask = net.IPMask(net.ParseIP(i.Netmask))[12:]
+		mask = net.IPMask(net.ParseIP(i.Netmask).To4())
 	} else {
 		mask = net.CIDRMask(i.Prefix, 32)
 	}
