@@ -125,6 +125,10 @@ func selectIFace(distrib string) string {
 	switch distrib {
 	case "debian10":
 		return "ens3"
+	case "debian11":
+		return "ens3"
+	case "rocky8":
+		return "ens3"
 	case "centos7":
 		return "eth0"
 	case "centos8":

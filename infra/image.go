@@ -229,6 +229,11 @@ func (i *Image) String() string {
 		i.Name, i.Pool, i.Source, i.Path, i.Format, i.Size, i.Capacity)
 }
 
+// ImageNameFromVolume compute the name of the image for the volume name of the hypervisor
+func ImageNameFromVolume(volName string) string {
+	return strings.Split(volName, "-base.")[0]
+}
+
 // LookupImages gets the detailed information on images found in the given
 // storage pool of hypervisor
 func LookupImages(h *hv.Hypervisor, poolName string, sourceMapDir string) ([]*Image, error) {

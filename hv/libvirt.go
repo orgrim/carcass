@@ -42,11 +42,12 @@ type Disk struct {
 }
 
 type Source struct {
-	Pool    string `xml:"pool,attr"`
-	Volume  string `xml:"volume,attr"`
-	File    string `xml:"file,attr"`
-	Network string `xml:"network,attr"`
-	Bridge  string `xml:"bridge,attr"`
+	Pool           string `xml:"pool,attr"`
+	Volume         string `xml:"volume,attr"`
+	File           string `xml:"file,attr"`
+	Network        string `xml:"network,attr"`
+	Bridge         string `xml:"bridge,attr"`
+	BackingVolName string
 }
 
 type Target struct {
@@ -266,7 +267,7 @@ func ListDomains(h Hypervisor) ([]Domain, error) {
 
 		xml, err := dom.GetXMLDesc(0)
 		if err != nil {
-			log.Println("could not get XML description of the domain: %s", err)
+			log.Printf("could not get XML description of the domain: %s", err)
 			continue
 		}
 
@@ -276,9 +277,29 @@ func ListDomains(h Hypervisor) ([]Domain, error) {
 			continue
 		}
 
+		for i, disk := range domain.Disks {
+			if disk.Source.Pool != "" && disk.Source.Volume != "" {
+				volume, err := LookupVolume(h, disk.Source.Pool, disk.Source.Volume)
+				if err != nil {
+					log.Printf("could not get information on volume %s (%s): %s", disk.Source.Volume, disk.Source.Pool, err)
+					continue
+				}
+
+				// find the name of the volume of the backing store
+				if volume.BackingStore != "" {
+					backVolume, err := LookupVolumeByPath(h, volume.BackingStore)
+					if err != nil {
+						log.Printf("could not get volume info for backing store %s: %s", volume.BackingStore, err)
+					} else {
+						domain.Disks[i].Source.BackingVolName = backVolume.Name
+					}
+				}
+			}
+		}
+
 		active, err := dom.IsActive()
 		if err != nil {
-			log.Println("could not get status of the domain: %s", err)
+			log.Printf("could not get status of the domain: %s", err)
 			continue
 		}
 

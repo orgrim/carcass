@@ -27,14 +27,15 @@ type Pool struct {
 }
 
 type Volume struct {
-	XMLName  xml.Name  `xml:"volume"`
-	Name     string    `xml:"name"`
-	Type     string    `xml:"type,attr"`
-	Key      string    `xml:"key"`
-	Capacity int64     `xml:"capacity"`
-	Size     int64     `xml:"physical"`
-	Path     string    `xml:"target>path"`
-	Format   VolFormat `xml:"target>format"`
+	XMLName      xml.Name  `xml:"volume"`
+	Name         string    `xml:"name"`
+	Type         string    `xml:"type,attr"`
+	Key          string    `xml:"key"`
+	Capacity     int64     `xml:"capacity"`
+	Size         int64     `xml:"physical"`
+	Path         string    `xml:"target>path"`
+	Format       VolFormat `xml:"target>format"`
+	BackingStore string    `xml:"backingStore>path"`
 }
 
 type VolFormat struct {
@@ -161,7 +162,27 @@ func LookupVolume(h Hypervisor, poolName string, volName string) (Volume, error)
 
 	volume, err := parseVolumeXMLDesc(xml)
 	if err != nil {
-		log.Println("could not parse the XML description of the storage pool: %s", err)
+		log.Println("could not parse the XML description of the storage volume: %s", err)
+	}
+
+	return volume, nil
+}
+
+func LookupVolumeByPath(h Hypervisor, path string) (Volume, error) {
+	sv, err := h.Conn.LookupStorageVolByPath(path)
+	if err != nil {
+		return Volume{}, fmt.Errorf("could not lookup volume %s: %w", path, err)
+	}
+	defer sv.Free()
+
+	xml, err := sv.GetXMLDesc(0)
+	if err != nil {
+		log.Println("could not get the XML description of the storage volume: %s", err)
+	}
+
+	volume, err := parseVolumeXMLDesc(xml)
+	if err != nil {
+		log.Println("could not parse the XML description of the storage volume: %s", err)
 	}
 
 	return volume, nil

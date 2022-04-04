@@ -52,11 +52,19 @@ func (e Environment) String() string {
 		}
 
 		s += fmt.Sprintf("  %s", e.Infra.Network.LookupDnsHostByName(d.Name))
+
+		for _, disk := range d.Disks {
+			if disk.Source.BackingVolName != "" {
+				s += fmt.Sprintf("  %s", infra.ImageNameFromVolume(disk.Source.BackingVolName))
+			}
+		}
+
 		if d.Status {
-			s += fmt.Sprintln(" (active)")
+			s += fmt.Sprintln("  active")
 		} else {
 			s += fmt.Sprint("\n")
 		}
+
 	}
 	return s
 }
